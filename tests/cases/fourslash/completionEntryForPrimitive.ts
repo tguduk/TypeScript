@@ -2,7 +2,6 @@
 
 ////var x = Object.create(/**/
 
-goTo.marker();
-verify.not.completionListIsEmpty();
+verify.completions({ marker: "", includes: "number", isNewIdentifierLocation: true });
 edit.insert("nu");
-verify.completionListContains("number", undefined, undefined, "keyword");
+verify.completions({ includes: { name: "number", kind: "keyword" }, isNewIdentifierLocation: true });
