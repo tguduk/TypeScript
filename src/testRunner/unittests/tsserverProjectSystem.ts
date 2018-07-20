@@ -647,12 +647,15 @@ namespace ts.projectSystem {
                 options: {}
             });
             service.checkNumberOfProjects({ configuredProjects: 1 });
-            checkProjectActualFiles(configuredProjectAt(service, 0), [upperCaseConfigFilePath]);
+            const project = service.configuredProjects.get(config.path)!;
+            assert.equal(project.pendingReload, ConfigFileProgramReloadLevel.Full); // External project referenced configured project pending to be reloaded
+            checkProjectActualFiles(project, emptyArray);
 
             service.openClientFile(f1.path);
             service.checkNumberOfProjects({ configuredProjects: 1, inferredProjects: 1 });
 
-            checkProjectActualFiles(configuredProjectAt(service, 0), [upperCaseConfigFilePath]);
+            assert.equal(project.pendingReload, ConfigFileProgramReloadLevel.None); // External project referenced configured project is updated
+            checkProjectActualFiles(project, [upperCaseConfigFilePath]);
             checkProjectActualFiles(service.inferredProjects[0], [f1.path]);
         });
 
@@ -762,7 +765,7 @@ namespace ts.projectSystem {
 
             // Add a tsconfig file
             host.reloadFS(filesWithConfig);
-            host.checkTimeoutQueueLengthAndRun(1);
+            host.checkTimeoutQueueLengthAndRun(2); // load configured project from disk + ensureProjectsForOpenFiles
 
             projectService.checkNumberOfProjects({ inferredProjects: 2, configuredProjects: 1 });
             assert.isTrue(projectService.inferredProjects[0].isOrphan());
@@ -1213,7 +1216,7 @@ namespace ts.projectSystem {
 
 
             host.reloadFS([file1, configFile, file2, file3, libFile]);
-            host.checkTimeoutQueueLengthAndRun(1);
+            host.checkTimeoutQueueLengthAndRun(2); // load configured project from disk + ensureProjectsForOpenFiles
             checkNumberOfConfiguredProjects(projectService, 1);
             checkNumberOfInferredProjects(projectService, 1);
             checkProjectActualFiles(projectService.inferredProjects[0], [file2.path, file3.path, libFile.path]);
@@ -1757,8 +1760,11 @@ namespace ts.projectSystem {
             try {
                 projectService.openExternalProject({ projectFileName: "project", options: {}, rootFiles: toExternalFiles([file1.path, office.path]) });
                 const proj = projectService.externalProjects[0];
-                assert.deepEqual(proj.getFileNames(/*excludeFilesFromExternalLibraries*/ true), [file1.path]);
+                // Since the file is not yet open, the project wont have program yet
+                assert.deepEqual(proj.getFileNames(/*excludeFilesFromExternalLibraries*/ true), emptyArray);
                 assert.deepEqual(proj.getTypeAcquisition().include, ["duck-types"]);
+                projectService.openClientFile(file1.path);
+                assert.deepEqual(proj.getFileNames(/*excludeFilesFromExternalLibraries*/ true), [file1.path]);
             } finally {
                 projectService.resetSafeList();
             }
@@ -1799,8 +1805,11 @@ namespace ts.projectSystem {
             try {
                 projectService.openExternalProject({ projectFileName: "project", options: {}, rootFiles: toExternalFiles(files.map(f => f.path)) });
                 const proj = projectService.externalProjects[0];
-                assert.deepEqual(proj.getFileNames(/*excludeFilesFromExternalLibraries*/ true), [file1.path]);
+                // Since the file is not yet open, the project wont have program yet
+                assert.deepEqual(proj.getFileNames(/*excludeFilesFromExternalLibraries*/ true), emptyArray);
                 assert.deepEqual(proj.getTypeAcquisition().include, ["kendo-ui", "office"]);
+                projectService.openClientFile(file1.path);
+                assert.deepEqual(proj.getFileNames(/*excludeFilesFromExternalLibraries*/ true), [file1.path]);
             } finally {
                 projectService.resetSafeList();
             }
@@ -1840,6 +1849,9 @@ namespace ts.projectSystem {
             try {
                 projectService.openExternalProject({ projectFileName: "project", options: {}, rootFiles: toExternalFiles([file1.path, file2.path]), typeAcquisition: { enable: true } });
                 const proj = projectService.externalProjects[0];
+                // Since the file is not yet open, the project wont have program yet
+                assert.deepEqual(proj.getFileNames(), emptyArray);
+                projectService.openClientFile(file2.path);
                 assert.deepEqual(proj.getFileNames(), [file2.path]);
             } finally {
                 projectService.resetSafeList();
@@ -1877,7 +1889,7 @@ namespace ts.projectSystem {
             checkProjectActualFiles(projectService.inferredProjects[1], [file3.path]);
 
             host.reloadFS([file1, file2, file3, configFile]);
-            host.checkTimeoutQueueLengthAndRun(1);
+            host.checkTimeoutQueueLengthAndRun(2); // load configured project from disk + ensureProjectsForOpenFiles
             checkNumberOfProjects(projectService, { configuredProjects: 1, inferredProjects: 2 });
             checkProjectActualFiles(configuredProjectAt(projectService, 0), [file1.path, file2.path, file3.path, configFile.path]);
             assert.isTrue(projectService.inferredProjects[0].isOrphan());
@@ -2055,6 +2067,9 @@ namespace ts.projectSystem {
 
             projectService.openExternalProject({ projectFileName: "project", options: {}, rootFiles: toExternalFiles([file1.path]) });
             checkNumberOfProjects(projectService, { externalProjects: 1 });
+            // Since the file is not yet open, the project wont have program yet
+            assert.deepEqual(projectService.externalProjects[0].getFileNames(), emptyArray);
+            projectService.openClientFile(file1.path);
             checkProjectActualFiles(projectService.externalProjects[0], [file1.path]);
 
             projectService.openExternalProject({ projectFileName: "project", options: {}, rootFiles: toExternalFiles([file1.path, file2.path]) });
@@ -2082,11 +2097,17 @@ namespace ts.projectSystem {
             projectService.openExternalProject({ projectFileName: "project", options: { moduleResolution: ModuleResolutionKind.NodeJs }, rootFiles: toExternalFiles([file1.path, file2.path]) });
             checkNumberOfProjects(projectService, { externalProjects: 1 });
             checkProjectRootFiles(projectService.externalProjects[0], [file1.path, file2.path]);
+            // Since the file is not yet open, the project wont have program yet
+            checkProjectActualFiles(projectService.externalProjects[0], emptyArray);
+            projectService.openClientFile(file1.path);
             checkProjectActualFiles(projectService.externalProjects[0], [file1.path, file2.path]);
 
             projectService.openExternalProject({ projectFileName: "project", options: { moduleResolution: ModuleResolutionKind.Classic }, rootFiles: toExternalFiles([file1.path, file2.path]) });
             checkNumberOfProjects(projectService, { externalProjects: 1 });
             checkProjectRootFiles(projectService.externalProjects[0], [file1.path, file2.path]);
+            // The update doesnt happen right away until needed, so either open a file or ensure projects uptodate
+            checkProjectActualFiles(projectService.externalProjects[0], [file1.path, file2.path]);
+            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(projectService.externalProjects[0], [file1.path, file2.path, file3.path]);
         });
 
@@ -2388,6 +2409,10 @@ namespace ts.projectSystem {
             projectService.openExternalProject({ projectFileName, options: {}, rootFiles: [{ fileName: file1.path, scriptKind: ScriptKind.JS, hasMixedContent: true }] });
 
             checkNumberOfProjects(projectService, { externalProjects: 1 });
+            // Since the external project is not updated till needed (eg opening client file/ensuringProjectStructureUptodate)
+            // watched files will be empty at first
+            checkWatchedFiles(host, emptyArray);
+            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkWatchedFiles(host, [libFile.path]); // watching the "missing" lib file
 
             const project = projectService.externalProjects[0];
@@ -2972,6 +2997,9 @@ namespace ts.projectSystem {
             projectService.openExternalProjects([externalProject]);
 
             checkNumberOfProjects(projectService, { configuredProjects: 0, externalProjects: 1, inferredProjects: 0 });
+            // Since the external project is not updated till needed (eg opening client file/ensuringProjectStructureUptodate)
+            checkProjectActualFiles(projectService.externalProjects[0], emptyArray);
+            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(projectService.externalProjects[0], [site.path, libFile.path]);
         });
 
@@ -3321,6 +3349,9 @@ namespace ts.projectSystem {
             checkNumberOfProjects(projectService, { configuredProjects: 1 });
 
             const configuredProject = configuredProjectAt(projectService, 0);
+            // configured project is just created and not yet loaded
+            checkProjectActualFiles(configuredProject, emptyArray);
+            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(configuredProject, [file1.path, tsconfig.path]);
 
             // Allow allowNonTsExtensions will be set to true for deferred extensions.
@@ -3866,6 +3897,8 @@ namespace ts.projectSystem {
                 options: {}
             });
             projectService.checkNumberOfProjects({ configuredProjects: 1 });
+            checkProjectActualFiles(configuredProjectAt(projectService, 0), emptyArray); // Configured project created but not loaded till actually needed
+            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(configuredProjectAt(projectService, 0), [f1.path, tsconfig.path]);
 
             // rename tsconfig.json back to lib.ts
@@ -3877,6 +3910,8 @@ namespace ts.projectSystem {
             });
 
             projectService.checkNumberOfProjects({ externalProjects: 1 });
+            checkProjectActualFiles(projectService.externalProjects[0], emptyArray); // external project created but not updated till actually needed
+            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(projectService.externalProjects[0], [f1.path, f2.path]);
         });
 
@@ -3914,6 +3949,8 @@ namespace ts.projectSystem {
             });
 
             projectService.checkNumberOfProjects({ externalProjects: 1 });
+            checkProjectActualFiles(projectService.externalProjects[0], emptyArray); // external project created but program is not created till its needed
+            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(projectService.externalProjects[0], [f1.path]);
 
             // add two config file as root files
@@ -3923,6 +3960,9 @@ namespace ts.projectSystem {
                 options: {}
             });
             projectService.checkNumberOfProjects({ configuredProjects: 2 });
+            checkProjectActualFiles(configuredProjectAt(projectService, 0), emptyArray); // Configured project created but not loaded till actually needed
+            checkProjectActualFiles(configuredProjectAt(projectService, 1), emptyArray); // Configured project created but not loaded till actually needed
+            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(configuredProjectAt(projectService, 0), [cLib.path, cTsconfig.path]);
             checkProjectActualFiles(configuredProjectAt(projectService, 1), [dLib.path, dTsconfig.path]);
 
@@ -3944,6 +3984,8 @@ namespace ts.projectSystem {
             });
 
             projectService.checkNumberOfProjects({ externalProjects: 1 });
+            checkProjectActualFiles(projectService.externalProjects[0], emptyArray); // external project created but program is not created till its needed
+            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(projectService.externalProjects[0], [f1.path]);
 
             // open two config files
@@ -3954,6 +3996,9 @@ namespace ts.projectSystem {
                 options: {}
             });
             projectService.checkNumberOfProjects({ configuredProjects: 2 });
+            checkProjectActualFiles(configuredProjectAt(projectService, 0), emptyArray); // Configured project created but not loaded till actually needed
+            checkProjectActualFiles(configuredProjectAt(projectService, 1), emptyArray); // Configured project created but not loaded till actually needed
+            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(configuredProjectAt(projectService, 0), [cLib.path, cTsconfig.path]);
             checkProjectActualFiles(configuredProjectAt(projectService, 1), [dLib.path, dTsconfig.path]);
 
