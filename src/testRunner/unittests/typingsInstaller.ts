@@ -328,8 +328,6 @@ namespace ts.projectSystem {
                 typeAcquisition: { enable: true, include: ["jquery"] }
             });
 
-            assert.isFalse(enqueueIsCalled, "expected enqueueIsCalled to be false since external project isnt updated right away");
-            projectService.ensureInferredProjectsUpToDate_TestOnly();
             assert.isTrue(enqueueIsCalled, "expected enqueueIsCalled to be true");
             installer.installAll(/*expectedCount*/ 1);
 
@@ -386,8 +384,6 @@ namespace ts.projectSystem {
 
             const p = projectService.externalProjects[0];
             projectService.checkNumberOfProjects({ externalProjects: 1 });
-            checkProjectActualFiles(p, emptyArray); // external project created but not updated
-            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(p, [file2Jsx.path, file3dts.path]);
 
             installer.installAll(/*expectedCount*/ 1);
@@ -432,8 +428,6 @@ namespace ts.projectSystem {
 
             const p = projectService.externalProjects[0];
             projectService.checkNumberOfProjects({ externalProjects: 1 });
-            checkProjectActualFiles(p, emptyArray); // external project created but not updated
-            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(p, [jqueryJs.path]);
 
             installer.checkPendingCommands(/*expectedCount*/ 0);
@@ -477,8 +471,6 @@ namespace ts.projectSystem {
             const p = projectService.externalProjects[0];
             projectService.checkNumberOfProjects({ externalProjects: 1 });
 
-            checkProjectActualFiles(p, emptyArray); // external project created but not updated
-            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(p, [jqueryJs.path, file2Ts.path]);
 
             installer.checkPendingCommands(/*expectedCount*/ 0);
@@ -554,8 +546,6 @@ namespace ts.projectSystem {
 
             const p = projectService.externalProjects[0];
             projectService.checkNumberOfProjects({ externalProjects: 1 });
-            checkProjectActualFiles(p, emptyArray); // external project created but not updated
-            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(p, [file3dts.path]);
 
             installer.installAll(/*expectedCount*/ 1);
@@ -638,8 +628,6 @@ namespace ts.projectSystem {
 
             const p = projectService.externalProjects[0];
             projectService.checkNumberOfProjects({ externalProjects: 1 });
-            checkProjectActualFiles(p, emptyArray); // external project created but not updated
-            projectService.ensureInferredProjectsUpToDate_TestOnly();
             checkProjectActualFiles(p, [file3.path]);
             installer.checkPendingCommands(/*expectedCount*/ 1);
             installer.executePendingCommands();
@@ -724,8 +712,6 @@ namespace ts.projectSystem {
                 typeAcquisition: { include: ["jquery", "cordova"] }
             });
 
-            checkProjectActualFiles(projectService.externalProjects[0], emptyArray); // external project created but not updated
-            projectService.ensureInferredProjectsUpToDate_TestOnly();
             installer.checkPendingCommands(/*expectedCount*/ 1);
             assert.equal(installer.pendingRunRequests.length, 0, "expect no throttled requests");
 
@@ -737,8 +723,6 @@ namespace ts.projectSystem {
                 rootFiles: [toExternalFile(file3.path)],
                 typeAcquisition: { include: ["grunt", "gulp"] }
             });
-            checkProjectActualFiles(projectService.externalProjects[1], emptyArray); // external project created but not updated
-            projectService.ensureInferredProjectsUpToDate_TestOnly();
             assert.equal(installer.pendingRunRequests.length, 1, "expect one throttled request");
 
             const p1 = projectService.externalProjects[0];
