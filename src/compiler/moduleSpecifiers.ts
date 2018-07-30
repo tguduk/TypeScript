@@ -17,7 +17,7 @@ namespace ts.moduleSpecifiers {
         redirectTargetsMap: RedirectTargetsMap,
     ): string {
         const info = getInfo(compilerOptions, importingSourceFile, importingSourceFileName, host);
-        const modulePaths = getAllModulePaths(files, toFileName, info.getCanonicalFileName, host, redirectTargetsMap);
+        const modulePaths = getAllModulePaths(files, importingSourceFileName, toFileName, info.getCanonicalFileName, host, redirectTargetsMap);
         return firstDefined(modulePaths, moduleFileName => getGlobalModuleSpecifier(moduleFileName, info, host, compilerOptions)) ||
             first(getLocalModuleSpecifiers(toFileName, info, compilerOptions, preferences));
     }
@@ -40,7 +40,7 @@ namespace ts.moduleSpecifiers {
             return Debug.fail("Files list must be present to resolve symlinks in specifier resolution");
         }
         const moduleSourceFile = getSourceFileOfNode(moduleSymbol.valueDeclaration);
-        const modulePaths = getAllModulePaths(files, moduleSourceFile.fileName, info.getCanonicalFileName, host, redirectTargetsMap);
+        const modulePaths = getAllModulePaths(files, importingSourceFile.path, moduleSourceFile.fileName, info.getCanonicalFileName, host, redirectTargetsMap);
 
         const global = mapDefined(modulePaths, moduleFileName => getGlobalModuleSpecifier(moduleFileName, info, host, compilerOptions));
         return global.length ? global.map(g => [g]) : modulePaths.map(moduleFileName =>
@@ -176,7 +176,7 @@ namespace ts.moduleSpecifiers {
      * Looks for existing imports that use symlinks to this module.
      * Symlinks will be returned first so they are preferred over the real path.
      */
-    function getAllModulePaths(files: ReadonlyArray<SourceFile>, importedFileName: string, getCanonicalFileName: (file: string) => string, host: ModuleSpecifierResolutionHost, redirectTargetsMap: RedirectTargetsMap): ReadonlyArray<string> {
+    function getAllModulePaths(files: ReadonlyArray<SourceFile>, importingFileName: string, importedFileName: string, getCanonicalFileName: GetCanonicalFileName, host: ModuleSpecifierResolutionHost, redirectTargetsMap: RedirectTargetsMap): ReadonlyArray<string> {
         const redirects = redirectTargetsMap.get(importedFileName);
         const importedFileNames = redirects ? [...redirects, importedFileName] : [importedFileName];
         const cwd = host.getCurrentDirectory ? host.getCurrentDirectory() : "";
@@ -186,6 +186,10 @@ namespace ts.moduleSpecifiers {
         const result: string[] = [];
         const compareStrings = (!host.useCaseSensitiveFileNames || host.useCaseSensitiveFileNames()) ? compareStringsCaseSensitive : compareStringsCaseInsensitive;
         links.forEach((resolved, path) => {
+            if (startsWithDirectory(importingFileName, resolved, getCanonicalFileName)) {
+                return; // Don't want to a package to globally import from itself
+            }
+
             const target = targets.find(t => compareStrings(t.slice(0, resolved.length + 1), resolved + "/") === Comparison.EqualTo);
             if (target === undefined) return;
 
